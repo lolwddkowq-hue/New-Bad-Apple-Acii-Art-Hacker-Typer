@@ -27,6 +27,10 @@ const soundtrack = new Audio('videoplayback.mp3');
 soundtrack.loop = true;
 soundtrack.preload = 'auto';
 soundtrack.volume = 0.6;
+const beepSound = new Audio('videoplayback.mp3');
+beepSound.preload = 'auto';
+beepSound.volume = 0.45;
+let beepStopTimer = 0;
 let audioCtx;
 let mediaAudioUnlocked = false;
 function ensureAudioContext() {
@@ -74,31 +78,35 @@ function ensureInteractionAudio(keepPlaying = true) {
 	}
 }
 function beep() {
-	const ctx = ensureAudioContext();
-	if (!ctx) {
-		return;
+	if (beepStopTimer) {
+		clearTimeout(beepStopTimer);
+		beepStopTimer = 0;
 	}
-	const startTone = () => {
-		const toneStart = ctx.currentTime + 0.001;
-		const osc = ctx.createOscillator();
-		const gain = ctx.createGain();
-		osc.type = 'square';
-		osc.frequency.setValueAtTime(900, toneStart);
-		gain.gain.setValueAtTime(0.0001, toneStart);
-		gain.gain.exponentialRampToValueAtTime(0.07, toneStart + 0.005);
-		gain.gain.exponentialRampToValueAtTime(0.0001, toneStart + 0.08);
-		osc.connect(gain);
-		gain.connect(ctx.destination);
-		osc.start(toneStart);
-		osc.stop(toneStart + 0.08);
+	beepSound.pause();
+	try {
+		beepSound.currentTime = 0;
+	} catch (_e) {
+	}
+	const stopSnippet = () => {
+		beepStopTimer = window.setTimeout(() => {
+			beepSound.pause();
+			try {
+				beepSound.currentTime = 0;
+			} catch (_e) {
+			}
+			beepStopTimer = 0;
+		}, 85);
 	};
-	if (ctx.state === 'running') {
-		startTone();
-		return;
+	const playPromise = beepSound.play();
+	if (playPromise && typeof playPromise.then === 'function') {
+		playPromise.then(() => {
+			mediaAudioUnlocked = true;
+			stopSnippet();
+		}).catch(() => {});
+	} else {
+		mediaAudioUnlocked = true;
+		stopSnippet();
 	}
-	ctx.resume().then(() => {
-		startTone();
-	}).catch(() => {});
 }
 function syncSoundtrack(forceAlign = false) {
 	if (forceAlign && Number.isFinite(video.currentTime) && Number.isFinite(soundtrack.duration) && soundtrack.duration > 0) {
