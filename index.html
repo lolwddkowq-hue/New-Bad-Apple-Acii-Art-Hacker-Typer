@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>Hacker Typer Bad Apple ASCII</title>
+	<style>
+		html, body {
+			margin: 0;
+			padding: 0;
+			width: 100%;
+			height: 100%;
+			background: #000;
+			color: #fff;
+			font-family: Consolas, Monaco, 'Courier New', monospace;
+			overflow: hidden;
+		}
+		#app {
+			display: flex;
+			flex-direction: column;
+			width: 100%;
+			height: 100%;
+		}
+		#topbar {
+			padding: 8px 12px;
+			background: #050505;
+			border-bottom: 1px solid #111;
+			font-size: 12px;
+			letter-spacing: 0.4px;
+			white-space: nowrap;
+			overflow: hidden;
+			text-overflow: ellipsis;
+		}
+		#screen {
+			flex: 1;
+			display: grid;
+			place-items: center;
+			padding: 10px;
+		}
+		#ascii {
+			margin: 0;
+			line-height: 1;
+			font-size: 8px;
+			white-space: pre;
+			user-select: none;
+		}
+		#hint {
+			position: fixed;
+			bottom: 10px;
+			left: 12px;
+			font-size: 12px;
+			opacity: 0.75;
+		}
+	</style>
+</head>
+<body>
+	<div id="app">
+		<div id="topbar">HACKER TYPER BAD APPLE ASCII | Press any key rapidly to boost playback | SPACE pause/resume</div>
+		<div id="screen"><pre id="ascii">Loading video...</pre></div>
+	</div>
+	<div id="hint">Type anywhere to drive the animation</div>
+	<video id="srcVideo" src="videoplayback.mp4" preload="auto" muted playsinline style="display:none"></video>
+	<canvas id="buffer" style="display:none"></canvas>
+	<script src="script.js"></script>
+</body>
+</html>
