@@ -28,28 +28,77 @@ soundtrack.loop = true;
 soundtrack.preload = 'auto';
 soundtrack.volume = 0.6;
 let audioCtx;
-function beep() {
+let mediaAudioUnlocked = false;
+function ensureAudioContext() {
 	const AudioCtx = window.AudioContext || window['webkitAudioContext'];
 	if (!AudioCtx) {
-		return;
+		return null;
 	}
 	if (!audioCtx) {
 		audioCtx = new AudioCtx();
 	}
-	if (audioCtx.state === 'suspended') {
-		audioCtx.resume().catch(() => {});
+	return audioCtx;
+}
+function tryUnlockAudio(keepPlaying = false) {
+	const ctx = ensureAudioContext();
+	if (ctx && ctx.state !== 'running') {
+		ctx.resume().catch(() => {});
 	}
-	const osc = audioCtx.createOscillator();
-	const gain = audioCtx.createGain();
-	osc.type = 'square';
-	osc.frequency.setValueAtTime(900, audioCtx.currentTime);
-	gain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
-	gain.gain.exponentialRampToValueAtTime(0.07, audioCtx.currentTime + 0.005);
-	gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.08);
-	osc.connect(gain);
-	gain.connect(audioCtx.destination);
-	osc.start();
-	osc.stop(audioCtx.currentTime + 0.08);
+	const finishUnlock = () => {
+		mediaAudioUnlocked = true;
+		if (keepPlaying && state.playing && Number.isFinite(video.currentTime) && Number.isFinite(soundtrack.duration) && soundtrack.duration > 0) {
+			const target = video.currentTime % soundtrack.duration;
+			if (Math.abs(soundtrack.currentTime - target) > 0.35) {
+				soundtrack.currentTime = target;
+			}
+		}
+		if (!keepPlaying || !state.playing) {
+			soundtrack.pause();
+		}
+	};
+	const playPromise = soundtrack.play();
+	if (playPromise && typeof playPromise.then === 'function') {
+		playPromise.then(finishUnlock).catch(() => {});
+	} else {
+		finishUnlock();
+	}
+}
+function ensureInteractionAudio(keepPlaying = true) {
+	if (!mediaAudioUnlocked) {
+		tryUnlockAudio(keepPlaying);
+		return;
+	}
+	const ctx = ensureAudioContext();
+	if (ctx && ctx.state === 'suspended') {
+		ctx.resume().catch(() => {});
+	}
+}
+function beep() {
+	const ctx = ensureAudioContext();
+	if (!ctx) {
+		return;
+	}
+	const startTone = () => {
+		const toneStart = ctx.currentTime + 0.001;
+		const osc = ctx.createOscillator();
+		const gain = ctx.createGain();
+		osc.type = 'square';
+		osc.frequency.setValueAtTime(900, toneStart);
+		gain.gain.setValueAtTime(0.0001, toneStart);
+		gain.gain.exponentialRampToValueAtTime(0.07, toneStart + 0.005);
+		gain.gain.exponentialRampToValueAtTime(0.0001, toneStart + 0.08);
+		osc.connect(gain);
+		gain.connect(ctx.destination);
+		osc.start(toneStart);
+		osc.stop(toneStart + 0.08);
+	};
+	if (ctx.state === 'running') {
+		startTone();
+		return;
+	}
+	ctx.resume().then(() => {
+		startTone();
+	}).catch(() => {});
 }
 function syncSoundtrack(forceAlign = false) {
 	if (forceAlign && Number.isFinite(video.currentTime) && Number.isFinite(soundtrack.duration) && soundtrack.duration > 0) {
@@ -59,6 +108,9 @@ function syncSoundtrack(forceAlign = false) {
 		}
 	}
 	if (state.playing) {
+		if (!mediaAudioUnlocked) {
+			return;
+		}
 		soundtrack.play().catch(() => {});
 	} else {
 		soundtrack.pause();
@@ -118,6 +170,7 @@ function tick(ts) {
 	requestAnimationFrame(tick);
 }
 function onType() {
+	ensureInteractionAudio(true);
 	const now = performance.now();
 	const rapid = now - state.lastTypeAt < 120;
 	state.lastTypeAt = now;
@@ -130,6 +183,7 @@ function onType() {
 	syncSoundtrack(true);
 }
 window.addEventListener('keydown', (e) => {
+	ensureInteractionAudio(true);
 	if (e.code === 'Space') {
 		e.preventDefault();
 		state.playing = !state.playing;
@@ -143,6 +197,10 @@ window.addEventListener('keydown', (e) => {
 	}
 	onType();
 });
+window.addEventListener('pointerdown', () => {
+	ensureInteractionAudio(state.playing);
+	syncSoundtrack(true);
+}, { passive: true });
 window.addEventListener('resize', fitAscii);
 video.addEventListener('loadeddata', () => {
 	fitAscii();
